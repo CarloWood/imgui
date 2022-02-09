@@ -1,37 +1,50 @@
-// dear imgui: "null" example application
-// (compile and link imgui, create context, run headless with NO INPUTS, NO GRAPHICS OUTPUT)
-// This is useful to test building, but you cannot interact with anything here!
 #include "imgui.h"
-#include <stdio.h>
+#include <cstdio>
 
-int main(int, char**)
+int main()
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
 
     // Build atlas
-    unsigned char* tex_pixels = NULL;
+    unsigned char* tex_pixels = nullptr;
     int tex_w, tex_h;
     io.Fonts->GetTexDataAsRGBA32(&tex_pixels, &tex_w, &tex_h);
 
-    for (int n = 0; n < 20; n++)
+    for (int n = 0; n < 3; n++)
     {
-        printf("NewFrame() %d\n", n);
-        io.DisplaySize = ImVec2(1920, 1080);
+        io.DisplaySize = ImVec2(150, 50);
         io.DeltaTime = 1.0f / 60.0f;
+
+        switch (n)
+        {
+          case 0:
+            break;
+          case 1:
+            io.AddMousePosEvent(75, 25);
+            io.AddMouseButtonEvent(0, true);
+            break;
+          case 2:
+//            io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+            io.AddMousePosEvent(76, 24);
+            io.AddMouseButtonEvent(0, false);
+//            io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+            break;
+        }
+
+        printf("NewFrame() %d\n", n);
         ImGui::NewFrame();
 
-        static float f = 0.0f;
-        ImGui::Text("Hello, world!");
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        ImGui::ShowDemoWindow(NULL);
+        if (ImGui::Button("Trigger Event", ImVec2(134, 134)))
+          printf("Button clicked!\n");
+        else
+          printf("Button not clicked!\n");
 
+        ImGui::EndFrame();
         ImGui::Render();
     }
 
     printf("DestroyContext()\n");
     ImGui::DestroyContext();
-    return 0;
 }
