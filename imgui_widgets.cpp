@@ -28,10 +28,22 @@ Index of this file:
 
 */
 
+#include "sys.h"
+#include "debug.h"
+
+#if defined(CWDEBUG) && !defined(DOXYGEN)
+NAMESPACE_DEBUG_CHANNELS_START
+extern channel_ct imguilib;
+NAMESPACE_DEBUG_CHANNELS_END
+#endif
+struct ImGuiContext;
+extern ImGuiContext const* tracked_context;
+
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#include "sys.h"
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
 
@@ -490,6 +502,7 @@ void ImGui::BulletTextV(const char* fmt, va_list args)
 
 bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool* out_held, ImGuiButtonFlags flags)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::ButtonBehavior({" << bb.Min.x << ", " << bb.Min.y << "; " << bb.Max.x << ", " << bb.Max.y << "}, out_hovered, out_held, " << flags << ")");
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = GetCurrentWindow();
 
@@ -513,19 +526,25 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
 
     bool pressed = false;
     bool hovered = ItemHoverable(bb, id);
+    Dout(dc::imguilib(GImGui == tracked_context), "hovered set to " << hovered << " because ItemHoverable() returned that.");
 
     // Drag source doesn't report as hovered
     if (hovered && g.DragDropActive && g.DragDropPayload.SourceId == id && !(g.DragDropSourceFlags & ImGuiDragDropFlags_SourceNoDisableHover))
+    {
+        Dout(dc::imguilib(GImGui == tracked_context), "1. Set hovered = false;");
         hovered = false;
+    }
 
     // Special mode for Drag and Drop where holding button pressed for a long time while dragging another item triggers the button
     if (g.DragDropActive && (flags & ImGuiButtonFlags_PressedOnDragDropHold) && !(g.DragDropSourceFlags & ImGuiDragDropFlags_SourceNoHoldToOpenOthers))
         if (IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
         {
+            Dout(dc::imguilib(GImGui == tracked_context), "1. Set hovered = true;");
             hovered = true;
             SetHoveredID(id);
             if (g.HoveredIdTimer - g.IO.DeltaTime <= DRAGDROP_HOLD_TO_OPEN_TIMER && g.HoveredIdTimer >= DRAGDROP_HOLD_TO_OPEN_TIMER)
             {
+                Dout(dc::imguilib(GImGui == tracked_context), "1. pressed = true");
                 pressed = true;
                 g.DragDropHoldJustPressedId = id;
                 FocusWindow(window);
@@ -537,7 +556,10 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
 
     // AllowOverlap mode (rarely used) requires previous frame HoveredId to be null or to match. This allows using patterns where a later submitted widget overlaps a previous one.
     if (hovered && (flags & ImGuiButtonFlags_AllowItemOverlap) && (g.HoveredIdPreviousFrame != id && g.HoveredIdPreviousFrame != 0))
+    {
+        Dout(dc::imguilib(GImGui == tracked_context), "2. Set hovered = false;");
         hovered = false;
+    }
 
     // Mouse handling
     if (hovered)
@@ -566,6 +588,7 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
                 }
                 if ((flags & ImGuiButtonFlags_PressedOnClick) || ((flags & ImGuiButtonFlags_PressedOnDoubleClick) && g.IO.MouseClickedCount[mouse_button_clicked] == 2))
                 {
+                    Dout(dc::imguilib(GImGui == tracked_context), "2. pressed = true");
                     pressed = true;
                     if (flags & ImGuiButtonFlags_NoHoldingActiveId)
                         ClearActiveID();
@@ -582,7 +605,10 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
                 // Repeat mode trumps on release behavior
                 const bool has_repeated_at_least_once = (flags & ImGuiButtonFlags_Repeat) && g.IO.MouseDownDurationPrev[mouse_button_released] >= g.IO.KeyRepeatDelay;
                 if (!has_repeated_at_least_once)
+                {
+                    Dout(dc::imguilib(GImGui == tracked_context), "3. pressed = true");
                     pressed = true;
+                }
                 if (!(flags & ImGuiButtonFlags_NoNavFocus))
                     SetFocusID(id, window);
                 ClearActiveID();
@@ -592,7 +618,10 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
             // Relies on repeat logic of IsMouseClicked() but we may as well do it ourselves if we end up exposing finer RepeatDelay/RepeatRate settings.
             if (g.ActiveId == id && (flags & ImGuiButtonFlags_Repeat))
                 if (g.IO.MouseDownDuration[g.ActiveIdMouseButton] > 0.0f && IsMouseClicked(g.ActiveIdMouseButton, true))
+                {
+                    Dout(dc::imguilib(GImGui == tracked_context), "4. pressed = true");
                     pressed = true;
+                }
         }
 
         if (pressed)
@@ -603,7 +632,10 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
     // We report navigated item as hovered but we don't set g.HoveredId to not interfere with mouse.
     if (g.NavId == id && !g.NavDisableHighlight && g.NavDisableMouseHover && (g.ActiveId == 0 || g.ActiveId == id || g.ActiveId == window->MoveId))
         if (!(flags & ImGuiButtonFlags_NoHoveredOnFocus))
+        {
+            Dout(dc::imguilib(GImGui == tracked_context), "2. Set hovered = true;");
             hovered = true;
+        }
     if (g.NavActivateDownId == id)
     {
         bool nav_activated_by_code = (g.NavActivateId == id);
@@ -611,6 +643,7 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
         if (nav_activated_by_code || nav_activated_by_inputs)
         {
             // Set active id so it can be queried by user via IsItemActive(), equivalent of holding the mouse button.
+            Dout(dc::imguilib(GImGui == tracked_context), "5. pressed = true");
             pressed = true;
             SetActiveID(id, window);
             g.ActiveIdSource = ImGuiInputSource_Nav;
@@ -621,8 +654,10 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
 
     // Process while held
     bool held = false;
+    Dout(dc::imguilib(GImGui == tracked_context), "g.ActiveId = " << g.ActiveId << "; id = " << id);
     if (g.ActiveId == id)
     {
+        Dout(dc::imguilib(GImGui == tracked_context), "g.ActiveIdSource = " << g.ActiveIdSource << "; ImGuiInputSource_Mouse = " << ImGuiInputSource_Mouse);
         if (g.ActiveIdSource == ImGuiInputSource_Mouse)
         {
             if (g.ActiveIdIsJustActivated)
@@ -630,6 +665,7 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
 
             const int mouse_button = g.ActiveIdMouseButton;
             IM_ASSERT(mouse_button >= 0 && mouse_button < ImGuiMouseButton_COUNT);
+            Dout(dc::imguilib(GImGui == tracked_context), "g.IO.MouseDown[mouse_button = " << mouse_button << "] = " << g.IO.MouseDown[mouse_button]);
             if (g.IO.MouseDown[mouse_button])
             {
                 held = true;
@@ -638,13 +674,18 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
             {
                 bool release_in = hovered && (flags & ImGuiButtonFlags_PressedOnClickRelease) != 0;
                 bool release_anywhere = (flags & ImGuiButtonFlags_PressedOnClickReleaseAnywhere) != 0;
+                Dout(dc::imguilib(GImGui == tracked_context), "release_in = " << release_in << ", release_anywhere = " << release_anywhere << ", g.DragDropActive = " << g.DragDropActive);
                 if ((release_in || release_anywhere) && !g.DragDropActive)
                 {
                     // Report as pressed when releasing the mouse (this is the most common path)
                     bool is_double_click_release = (flags & ImGuiButtonFlags_PressedOnDoubleClick) && g.IO.MouseReleased[mouse_button] && g.IO.MouseClickedLastCount[mouse_button] == 2;
                     bool is_repeating_already = (flags & ImGuiButtonFlags_Repeat) && g.IO.MouseDownDurationPrev[mouse_button] >= g.IO.KeyRepeatDelay; // Repeat mode trumps <on release>
+                    Dout(dc::imguilib(GImGui == tracked_context), "is_double_click_release = " << is_double_click_release << ", is_repeating_already = " << is_repeating_already);
                     if (!is_double_click_release && !is_repeating_already)
+                    {
+                        Dout(dc::imguilib(GImGui == tracked_context), "6. pressed = true");
                         pressed = true;
+                    }
                 }
                 ClearActiveID();
             }
@@ -669,9 +710,13 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
 
 bool ImGui::ButtonEx(const char* label, const ImVec2& size_arg, ImGuiButtonFlags flags)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::ButtonEx(\"" << label << "\", {" << size_arg.x << ", " << size_arg.y << "}, " << flags << ")");
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems)
+    {
+      Dout(dc::imguilib, "returning false because window->SkipItems is true.");
         return false;
+    }
 
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;
@@ -686,7 +731,10 @@ bool ImGui::ButtonEx(const char* label, const ImVec2& size_arg, ImGuiButtonFlags
     const ImRect bb(pos, pos + size);
     ItemSize(size, style.FramePadding.y);
     if (!ItemAdd(bb, id))
+    {
+      Dout(dc::imguilib, "returning false because ItemAdd(bb, id) is false.");
         return false;
+    }
 
     if (g.LastItemData.InFlags & ImGuiItemFlags_ButtonRepeat)
         flags |= ImGuiButtonFlags_Repeat;
@@ -708,6 +756,7 @@ bool ImGui::ButtonEx(const char* label, const ImVec2& size_arg, ImGuiButtonFlags
     //    CloseCurrentPopup();
 
     IMGUI_TEST_ENGINE_ITEM_INFO(id, label, g.LastItemData.StatusFlags);
+    Dout(dc::imguilib, "returning " << std::boolalpha << pressed << " because ButtonBehavior() returned that.");
     return pressed;
 }
 

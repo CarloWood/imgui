@@ -1,3 +1,5 @@
+#include "sys.h"
+#include "debug.h"
 // dear imgui, v1.87 WIP
 // (main code and documentation)
 
@@ -31,6 +33,12 @@
 // modifying imgui.h or imgui.cpp. You may include imgui_internal.h to access internal data structures, but it doesn't
 // come with any guarantee of forward compatibility. Discussing your changes on the GitHub Issue Tracker may lead you
 // to a better solution or official support for them.
+//
+#if defined(CWDEBUG) && !defined(DOXYGEN)
+NAMESPACE_DEBUG_CHANNELS_START
+channel_ct imguilib("IMGUILIB");
+NAMESPACE_DEBUG_CHANNELS_END
+#endif
 
 /*
 
@@ -1105,8 +1113,12 @@ void ImGuiStyle::ScaleAllSizes(float scale_factor)
     MouseCursorScale = ImFloor(MouseCursorScale * scale_factor);
 }
 
+ImGuiContext const* tracked_context = nullptr;
+void SetTrackedContex(ImGuiContext const* tc) { tracked_context = tc; }
+
 ImGuiIO::ImGuiIO()
 {
+    DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGuiIO::ImGuiIO() [" << this << "]");
     // Most fields are initialized with zero
     memset(this, 0, sizeof(*this));
     IM_ASSERT(IM_ARRAYSIZE(ImGuiIO::MouseDown) == ImGuiMouseButton_COUNT && IM_ARRAYSIZE(ImGuiIO::MouseClicked) == ImGuiMouseButton_COUNT); // Our pre-C++11 IM_STATIC_ASSERT() macros triggers warning on modern compilers so we don't use it here.
@@ -1160,6 +1172,7 @@ ImGuiIO::ImGuiIO()
     MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
     MousePosPrev = ImVec2(-FLT_MAX, -FLT_MAX);
     MouseDragThreshold = 6.0f;
+    Dout(dc::imguilib(GImGui == tracked_context), "Initializing MouseDownDuration[0] and MouseDownDurationPrev[0] to -1.0f");
     for (int i = 0; i < IM_ARRAYSIZE(MouseDownDuration); i++) MouseDownDuration[i] = MouseDownDurationPrev[i] = -1.0f;
     for (int i = 0; i < IM_ARRAYSIZE(KeysData); i++) { KeysData[i].DownDuration = KeysData[i].DownDurationPrev = -1.0f; }
     for (int i = 0; i < IM_ARRAYSIZE(NavInputsDownDuration); i++) NavInputsDownDuration[i] = -1.0f;
@@ -1173,6 +1186,7 @@ ImGuiIO::ImGuiIO()
 // FIXME: Should in theory be called "AddCharacterEvent()" to be consistent with new API
 void ImGuiIO::AddInputCharacter(unsigned int c)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGuiIO::AddInputCharacter(" << c << ")");
     ImGuiContext& g = *GImGui;
     IM_ASSERT(&g.IO == this && "Can only add events to current context.");
     if (c == 0)
@@ -1289,6 +1303,7 @@ void ImGuiIO::AddKeyAnalogEvent(ImGuiKey key, bool down, float analog_value)
 
 void ImGuiIO::AddKeyEvent(ImGuiKey key, bool down)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGuiIO::AddKeyEvent(" << key << ", " << (down ? "down" : "not down"));
     AddKeyAnalogEvent(key, down, down ? 1.0f : 0.0f);
 }
 
@@ -1317,6 +1332,7 @@ void ImGuiIO::SetKeyEventNativeData(ImGuiKey key, int native_keycode, int native
 
 void ImGuiIO::AddKeyModsEvent(ImGuiKeyModFlags modifiers)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGuiIO::AddKeyModsEvent(" << modifiers << ")");
     ImGuiContext& g = *GImGui;
     IM_ASSERT(&g.IO == this && "Can only add events to current context.");
 
@@ -1330,6 +1346,7 @@ void ImGuiIO::AddKeyModsEvent(ImGuiKeyModFlags modifiers)
 // Queue a mouse move event
 void ImGuiIO::AddMousePosEvent(float x, float y)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGuiIO::AddMousePosEvent(" << x << ", " << y << ")");
     ImGuiContext& g = *GImGui;
     IM_ASSERT(&g.IO == this && "Can only add events to current context.");
 
@@ -1343,6 +1360,7 @@ void ImGuiIO::AddMousePosEvent(float x, float y)
 
 void ImGuiIO::AddMouseButtonEvent(int mouse_button, bool down)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGuiIO::AddMouseButtonEvent(" << mouse_button << ", " << (down ? "down" : "not down") << ")");
     ImGuiContext& g = *GImGui;
     IM_ASSERT(&g.IO == this && "Can only add events to current context.");
     IM_ASSERT(mouse_button >= 0 && mouse_button < ImGuiMouseButton_COUNT);
@@ -1358,6 +1376,7 @@ void ImGuiIO::AddMouseButtonEvent(int mouse_button, bool down)
 // Queue a mouse wheel event (most mouse/API will only have a Y component)
 void ImGuiIO::AddMouseWheelEvent(float wheel_x, float wheel_y)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGuiIO::AddMouseWheelEvent(" << wheel_x << ", " << wheel_y << ")");
     ImGuiContext& g = *GImGui;
     IM_ASSERT(&g.IO == this && "Can only add events to current context.");
     if (wheel_x == 0.0f && wheel_y == 0.0f)
@@ -1373,6 +1392,7 @@ void ImGuiIO::AddMouseWheelEvent(float wheel_x, float wheel_y)
 
 void ImGuiIO::AddFocusEvent(bool focused)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGuiIO::AddFocusEvent(" << std::boolalpha << focused << ")");
     ImGuiContext& g = *GImGui;
     IM_ASSERT(&g.IO == this && "Can only add events to current context.");
 
@@ -3496,22 +3516,40 @@ bool ImGui::IsItemHovered(ImGuiHoveredFlags flags)
 // Internal facing ItemHoverable() used when submitting widgets. Differs slightly from IsItemHovered().
 bool ImGui::ItemHoverable(const ImRect& bb, ImGuiID id)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::ItemHoverable(...)");
     ImGuiContext& g = *GImGui;
     if (g.HoveredId != 0 && g.HoveredId != id && !g.HoveredIdAllowOverlap)
+    {
+        Dout(dc::imguilib(GImGui == tracked_context), "1. return false");
         return false;
+    }
 
     ImGuiWindow* window = g.CurrentWindow;
+    Dout(dc::imguilib(GImGui == tracked_context), "g.HoveredWindow = " << g.HoveredWindow << ", g.CurrentWindow = " << g.CurrentWindow);
     if (g.HoveredWindow != window)
+    {
+        Dout(dc::imguilib(GImGui == tracked_context), "2. return false");
         return false;
+    }
     if (g.ActiveId != 0 && g.ActiveId != id && !g.ActiveIdAllowOverlap)
+    {
+        Dout(dc::imguilib(GImGui == tracked_context), "3. return false");
         return false;
+    }
     if (!IsMouseHoveringRect(bb.Min, bb.Max))
+    {
+        Dout(dc::imguilib(GImGui == tracked_context), "4. return false");
         return false;
+    }
     if (g.NavDisableMouseHover)
+    {
+        Dout(dc::imguilib(GImGui == tracked_context), "5. return false");
         return false;
+    }
     if (!IsWindowContentHoverable(window, ImGuiHoveredFlags_None))
     {
         g.HoveredIdDisabled = true;
+        Dout(dc::imguilib(GImGui == tracked_context), "6. return false");
         return false;
     }
 
@@ -3528,6 +3566,7 @@ bool ImGui::ItemHoverable(const ImRect& bb, ImGuiID id)
         if (g.ActiveId == id)
             ClearActiveID();
         g.HoveredIdDisabled = true;
+        Dout(dc::imguilib(GImGui == tracked_context), "7. return false");
         return false;
     }
 
@@ -3544,6 +3583,7 @@ bool ImGui::ItemHoverable(const ImRect& bb, ImGuiID id)
             IM_DEBUG_BREAK();
     }
 
+    Dout(dc::imguilib(GImGui == tracked_context), "Return true");
     return true;
 }
 
@@ -3659,17 +3699,26 @@ void ImGui::GetAllocatorFunctions(ImGuiMemAllocFunc* p_alloc_func, ImGuiMemFreeF
     *p_user_data = GImAllocatorUserData;
 }
 
-ImGuiContext* ImGui::CreateContext(ImFontAtlas* shared_font_atlas)
+ImGuiContext* ImGui::CreateContext(bool debug, ImFontAtlas* shared_font_atlas)
 {
+  DoutEntering(dc::imguilib(debug), "ImGui::CreateContext(" << shared_font_atlas << ")");
     ImGuiContext* ctx = IM_NEW(ImGuiContext)(shared_font_atlas);
     if (GImGui == NULL)
+    {
+        if (debug)
+        {
+          tracked_context = ctx;
+          Dout(dc::imguilib, "tracked_context set to " << tracked_context);
+        }
         SetCurrentContext(ctx);
+    }
     Initialize(ctx);
     return ctx;
 }
 
 void ImGui::DestroyContext(ImGuiContext* ctx)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::DestroyContext(" << ctx << ")");
     if (ctx == NULL)
         ctx = GImGui;
     Shutdown(ctx);
@@ -3717,6 +3766,7 @@ ImGuiIO& ImGui::GetIO()
 // Pass this to your backend rendering function! Valid after Render() and until the next call to NewFrame()
 ImDrawData* ImGui::GetDrawData()
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::GetDrawData()");
     ImGuiContext& g = *GImGui;
     ImGuiViewportP* viewport = g.Viewports[0];
     return viewport->DrawDataP.Valid ? &viewport->DrawDataP : NULL;
@@ -3810,6 +3860,7 @@ void ImGui::StartMouseMovingWindow(ImGuiWindow* window)
 // but if we should more thoroughly test cases where g.ActiveId or g.MovingWindow gets changed and not the other.
 void ImGui::UpdateMouseMovingWindowNewFrame()
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::UpdateMouseMovingWindowNewFrame()");
     ImGuiContext& g = *GImGui;
     if (g.MovingWindow != NULL)
     {
@@ -3968,6 +4019,7 @@ static void ImGui::UpdateMouseInputs()
 {
     ImGuiContext& g = *GImGui;
     ImGuiIO& io = g.IO;
+    DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::UpdateMouseInputs() [io = " << &io << "]");
 
     // Round mouse position to avoid spreading non-rounded position (e.g. UpdateManualResize doesn't support them well)
     if (IsMousePosValid(&io.MousePos))
@@ -3987,10 +4039,14 @@ static void ImGui::UpdateMouseInputs()
     for (int i = 0; i < IM_ARRAYSIZE(io.MouseDown); i++)
     {
         io.MouseClicked[i] = io.MouseDown[i] && io.MouseDownDuration[i] < 0.0f;
+        Dout(dc::imguilib(GImGui == tracked_context)(i == 0), "io.MouseClicked[0] set to " << io.MouseClicked[i] << " because io.MouseDown[0]=" << io.MouseDown[i] << " and io.MouseDownDuration[0]=" << io.MouseDownDuration[i] << " (< 0.0f?)");
         io.MouseClickedCount[i] = 0; // Will be filled below
         io.MouseReleased[i] = !io.MouseDown[i] && io.MouseDownDuration[i] >= 0.0f;
+        Dout(dc::imguilib(GImGui == tracked_context)(i == 0), "io.MouseReleased[0] set to " << io.MouseReleased[i] << " because io.MouseDown[0]=" << io.MouseDown[i] << " and io.MouseDownDuration[0]=" << io.MouseDownDuration[i] << " (>= 0.0f?)");
         io.MouseDownDurationPrev[i] = io.MouseDownDuration[i];
+        Dout(dc::imguilib(GImGui == tracked_context)(i == 0), "io.MouseDownDurationPrev[0] set to io.MouseDownDuration[0] = " << io.MouseDownDurationPrev[i]);
         io.MouseDownDuration[i] = io.MouseDown[i] ? (io.MouseDownDuration[i] < 0.0f ? 0.0f : io.MouseDownDuration[i] + io.DeltaTime) : -1.0f;
+        Dout(dc::imguilib(GImGui == tracked_context)(i == 0), "io.MouseDownDuration[0] set to " << io.MouseDownDuration[i] << " because io.MouseDown[0]=" << io.MouseDown[i] << ", io.MouseDownDuration[0]=" << io.MouseDownDurationPrev[i] << ", io.DeltaTime=" << io.DeltaTime);
         if (io.MouseClicked[i])
         {
             bool is_repeated_click = false;
@@ -4123,6 +4179,7 @@ void ImGui::UpdateMouseWheel()
 // The reason this is exposed in imgui_internal.h is: on touch-based system that don't have hovering, we want to dispatch inputs to the right target (imgui vs imgui+app)
 void ImGui::UpdateHoveredWindowAndCaptureFlags()
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::UpdateHoveredWindowAndCaptureFlags()");
     ImGuiContext& g = *GImGui;
     ImGuiIO& io = g.IO;
     g.WindowsHoverPadding = ImMax(g.Style.TouchExtraPadding, ImVec2(WINDOWS_HOVER_PADDING, WINDOWS_HOVER_PADDING));
@@ -4171,7 +4228,10 @@ void ImGui::UpdateHoveredWindowAndCaptureFlags()
         clear_hovered_windows = true;
 
     if (clear_hovered_windows)
+    {
+      Dout(dc::imguilib(GImGui == tracked_context), "1. g.HoveredWindow = NULL");
         g.HoveredWindow = g.HoveredWindowUnderMovingWindow = NULL;
+    }
 
     // Update io.WantCaptureMouse for the user application (true = dispatch mouse info to Dear ImGui only, false = dispatch mouse to Dear ImGui + underlying app)
     // Update io.WantCaptureMouseAllowPopupClose (experimental) to give a chance for app to react to popup closure with a drag
@@ -4210,6 +4270,8 @@ ImGuiKeyModFlags ImGui::GetMergedKeyModFlags()
 
 void ImGui::NewFrame()
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::NewFrame()");
+
     IM_ASSERT(GImGui != NULL && "No current context. Did you call ImGui::CreateContext() and ImGui::SetCurrentContext() ?");
     ImGuiContext& g = *GImGui;
 
@@ -4480,6 +4542,7 @@ void ImGui::Shutdown(ImGuiContext* context)
     g.CurrentWindowStack.clear();
     g.WindowsById.Clear();
     g.NavWindow = NULL;
+    Dout(dc::imguilib(GImGui == tracked_context), "2. g.HoveredWindow = NULL");
     g.HoveredWindow = g.HoveredWindowUnderMovingWindow = NULL;
     g.ActiveIdWindow = g.ActiveIdPreviousFrameWindow = NULL;
     g.MovingWindow = NULL;
@@ -4749,6 +4812,8 @@ static void ImGui::RenderDimmedBackgrounds()
 // This is normally called by Render(). You may want to call it directly if you want to avoid calling Render() but the gain will be very minimal.
 void ImGui::EndFrame()
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::EndFrame()");
+
     ImGuiContext& g = *GImGui;
     IM_ASSERT(g.Initialized);
 
@@ -4832,6 +4897,8 @@ void ImGui::EndFrame()
 // it is the role of the ImGui_ImplXXXX_RenderDrawData() function provided by the renderer backend)
 void ImGui::Render()
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::Render()");
+
     ImGuiContext& g = *GImGui;
     IM_ASSERT(g.Initialized);
 
@@ -4929,6 +4996,7 @@ ImVec2 ImGui::CalcTextSize(const char* text, const char* text_end, bool hide_tex
 // called, aka before the next Begin(). Moving window isn't affected.
 static void FindHoveredWindow()
 {
+    DoutEntering(dc::imguilib(GImGui == tracked_context), "FindHoveredWindow()");
     ImGuiContext& g = *GImGui;
 
     ImGuiWindow* hovered_window = NULL;
@@ -4975,6 +5043,7 @@ static void FindHoveredWindow()
             break;
     }
 
+    Dout(dc::imguilib(GImGui == tracked_context), "HoveredWindow = " << hovered_window);
     g.HoveredWindow = hovered_window;
     g.HoveredWindowUnderMovingWindow = hovered_window_ignoring_moving_window;
 }
@@ -7451,6 +7520,7 @@ bool ImGui::IsRectVisible(const ImVec2& rect_min, const ImVec2& rect_max)
 // NB- Expand the rectangle to be generous on imprecise inputs systems (g.Style.TouchExtraPadding)
 bool ImGui::IsMouseHoveringRect(const ImVec2& r_min, const ImVec2& r_max, bool clip)
 {
+  DoutEntering(dc::imguilib(GImGui == tracked_context), "ImGui::IsMouseHoveringRect()");
     ImGuiContext& g = *GImGui;
 
     // Clip
@@ -7460,6 +7530,7 @@ bool ImGui::IsMouseHoveringRect(const ImVec2& r_min, const ImVec2& r_max, bool c
 
     // Expand for touch input
     const ImRect rect_for_touch(rect_clipped.Min - g.Style.TouchExtraPadding, rect_clipped.Max + g.Style.TouchExtraPadding);
+    Dout(dc::imguilib(GImGui == tracked_context), "Using g.IO.MousePos = (" << g.IO.MousePos.x << ", " << g.IO.MousePos.y << ")");
     if (!rect_for_touch.Contains(g.IO.MousePos))
         return false;
     return true;
@@ -7759,35 +7830,58 @@ void ImGui::UpdateInputEvents(bool trickle_fast_inputs)
     ImBitArray<ImGuiKey_KeysData_SIZE> key_changed_mask;
 
     int event_n = 0;
+    Dout(dc::imguilib(GImGui == tracked_context), "Starting InputEventsQueue(" << std::boolalpha << trickle_fast_inputs << ") with Size = " << g.InputEventsQueue.Size << " (mouse_moved and mouse_button_changed reset)");
     for (; event_n < g.InputEventsQueue.Size; event_n++)
     {
         const ImGuiInputEvent* e = &g.InputEventsQueue[event_n];
         if (e->Type == ImGuiInputEventType_MousePos)
         {
+            Dout(dc::imguilib(GImGui == tracked_context), "Processing event ImGuiInputEventType_MousePos at (" << e->MousePos.PosX << ", " << e->MousePos.PosY << ")");
             ImVec2 event_pos(e->MousePos.PosX, e->MousePos.PosY);
             if (IsMousePosValid(&event_pos))
                 event_pos = ImVec2(ImFloorSigned(event_pos.x), ImFloorSigned(event_pos.y)); // Apply same flooring as UpdateMouseInputs()
             if (io.MousePos.x != event_pos.x || io.MousePos.y != event_pos.y)
             {
+                Dout(dc::imguilib(GImGui == tracked_context), "  mouse coordinates changed (last value: (" << io.MousePos.x << ", " << io.MousePos.y << ")");
                 // Trickling Rule: Stop processing queued events if we already handled a mouse button change
                 if (trickle_fast_inputs && (mouse_button_changed != 0 || mouse_wheeled || key_changed || key_mods_changed || text_inputed))
+                {
+                    if (mouse_button_changed)
+                      Dout(dc::imguilib(GImGui == tracked_context), "  stopping because mouse_button_changed=0x" << std::hex << mouse_button_changed << " != 0");
+                    else
+                      Dout(dc::imguilib(GImGui == tracked_context), "  stopping because mouse_button_changed=0x" << std::hex << mouse_button_changed << ", mouse_wheeled=" << mouse_wheeled << ", key_changed=" << key_changed << ", key_mods_changed=" << key_mods_changed << ", text_inputed=" << text_inputed);
                     break;
+                }
                 io.MousePos = event_pos;
                 mouse_moved = true;
+                Dout(dc::imguilib(GImGui == tracked_context), "  io.MousePos set to (" << event_pos.x << ", " << event_pos.y << ") and mouse_moved set to true.");
             }
+            else
+              Dout(dc::imguilib(GImGui == tracked_context), "  Ignored because mouse didn't move. ");
         }
         else if (e->Type == ImGuiInputEventType_MouseButton)
         {
+            Dout(dc::imguilib(GImGui == tracked_context), "Processing event ImGuiInputEventType_MouseButton for button " << e->MouseButton.Button << " with io.MousePos = (" << io.MousePos.x << ", " << io.MousePos.y << ")");
             const ImGuiMouseButton button = e->MouseButton.Button;
             IM_ASSERT(button >= 0 && button < ImGuiMouseButton_COUNT);
             if (io.MouseDown[button] != e->MouseButton.Down)
             {
                 // Trickling Rule: Stop processing queued events if we got multiple action on the same button
                 if (trickle_fast_inputs && ((mouse_button_changed & (1 << button)) || mouse_wheeled))
+                {
+                    if ((mouse_button_changed & (1 << button)))
+                      Dout(dc::imguilib(GImGui == tracked_context), "  stopping because mouse_button_changed=0x" << std::hex << mouse_button_changed);
+                    else
+                      Dout(dc::imguilib(GImGui == tracked_context), "  stopping because mouse_wheeled=" << mouse_wheeled);
                     break;
+                }
                 io.MouseDown[button] = e->MouseButton.Down;
+                Dout(dc::imguilib(GImGui == tracked_context), "  io.MouseDown[button = " << button << "] is now " << io.MouseDown[button]);
                 mouse_button_changed |= (1 << button);
+                Dout(dc::imguilib(GImGui == tracked_context), "  mouse_button_changed is now 0x" << std::hex << mouse_button_changed << ".");
             }
+            else
+              Dout(dc::imguilib(GImGui == tracked_context), "  Ignored because button state didn't change. ");
         }
         else if (e->Type == ImGuiInputEventType_MouseWheel)
         {
@@ -7845,6 +7939,7 @@ void ImGui::UpdateInputEvents(bool trickle_fast_inputs)
         }
         else if (e->Type == ImGuiInputEventType_Focus)
         {
+            Dout(dc::imguilib(GImGui == tracked_context), "Processing event ImGuiInputEventType_Focus for Focused = " << e->AppFocused.Focused);
             // We intentionally overwrite this and process lower, in order to give a chance
             // to multi-viewports backends to queue AddFocusEvent(false) + AddFocusEvent(true) in same frame.
             io.AppFocusLost = !e->AppFocused.Focused;

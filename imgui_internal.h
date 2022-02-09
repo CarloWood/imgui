@@ -1950,6 +1950,8 @@ struct ImGuiContext
     }
 };
 
+void SetTrackedContex(ImGuiContext const* tc);
+
 //-----------------------------------------------------------------------------
 // [SECTION] ImGuiWindowTempData, ImGuiWindow
 //-----------------------------------------------------------------------------
