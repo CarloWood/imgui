@@ -1,13 +1,18 @@
 // dear imgui: "null" example application
 // (compile and link imgui, create context, run headless with NO INPUTS, NO GRAPHICS OUTPUT)
 // This is useful to test building, but you cannot interact with anything here!
+#include "sys.h"
 #include "imgui.h"
 #include <stdio.h>
+#include "debug.h"
 
 int main(int, char**)
 {
+    Debug(NAMESPACE_DEBUG::init());
+    Dout(dc::notice, "Entering main()");
+
     IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+    ImGui::CreateContext(true);
     ImGuiIO& io = ImGui::GetIO();
 
     // Build atlas

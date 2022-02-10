@@ -9,6 +9,7 @@
 # Options
 WITH_EXTRA_WARNINGS ?= 0
 WITH_FREETYPE ?= 0
+WITH_LIBCWD ?= 0
 
 EXE = example_null
 IMGUI_DIR = ../..
@@ -32,6 +33,14 @@ ifeq ($(WITH_FREETYPE), 1)
 	SOURCES += $(IMGUI_DIR)/misc/freetype/imgui_freetype.cpp
 	CXXFLAGS += $(shell pkg-config --cflags freetype2)
 	LIBS += $(shell pkg-config --libs freetype2)
+endif
+
+ifeq ($(WITH_LIBCWD), 1)
+	# Where to find "sys.h", "debug.h" and cwds/.
+	PROJECT_ROOT = $(IMGUI_DIR)/../..
+	CXXFLAGS += -std=c++17 -I$(PROJECT_ROOT) $(shell pkg-config --cflags libcwd_r) -pthread
+	LIBS += $(shell pkg-config --libs libcwd_r)
+	SOURCES += $(PROJECT_ROOT)/cwds/debug.cxx
 endif
 
 ##---------------------------------------------------------------------
@@ -69,6 +78,11 @@ endif
 ##---------------------------------------------------------------------
 ## BUILD RULES
 ##---------------------------------------------------------------------
+
+ifeq ($(WITH_LIBCWD), 1)
+%.o:$(PROJECT_ROOT)/cwds/%.cxx
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+endif
 
 %.o:%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
